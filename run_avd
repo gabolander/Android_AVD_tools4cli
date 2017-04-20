@@ -1,0 +1,146 @@
+#!/bin/bash
+
+function is_number() {
+	VARIABLE=$1
+	if [ $VARIABLE -eq $VARIABLE 2> /dev/null ]; then
+		# echo $VARIABLE is a number
+		isnumber=YES
+	else
+		isnumber=NO
+	fi
+}
+
+function ordina()
+{
+	sorttype=$1
+
+# 	if [ $sorttype -eq 0 ]; then # Ora è normale, ma il precedente aveva la data al primo campo
+# 		echo " Sort type = 0 "
+# 	else
+# 		echo " Sort type = 1 "
+# 	fi
+
+	if [ $sorttype -eq 1 ]; then
+		IFS=$'\n' sorted=($(sort -k2 -t$'\t' <<<"${filedata[*]}"))
+	else
+		IFS=$'\n' sorted=($(sort <<<"${filedata[*]}"))
+	fi
+	unset IFS
+
+	# copy=(${original[*]})
+	#filedata=(${sorted[*]})
+	# -- non funziona bene. Uso l'iterazione
+	for (( j=0; j<${#sorted[@]}; j++))
+	do
+		filedata[$j]="${sorted[$j]}"
+	done
+
+
+	## Fonte: http://stackoverflow.com/questions/7442417/how-to-sort-an-array-in-bash
+	##
+	## example:
+	## $ array=("a c" b f "3 5")
+	## $ IFS=$'\n' sorted=($(sort <<<"${array[*]}"))
+	## $ printf "[%s]\n" "${sorted[@]}"
+	## [3 5]
+	## [a c]
+	## [b]
+	## [f]
+}
+
+
+PROJECTS_REPDIR="$HOME/Dropbox/Android-stuff/Dev/SDK-projects"
+TAB=$(echo -ne "\t")
+
+WRITABLE="-writable-system"
+LIBSTDC_PATH=/usr/lib/x86_64-linux-gnu/libstdc++.so.6
+EMULATOR_PATH=/opt/Android/Sdk/emulator/emulator
+
+# LD_PRELOAD='/usr/lib/x86_64-linux-gnu/libstdc++.so.6' ~/Android/Sdk/tools/emulator -netdelay none -netspeed full -avd Nexus_5_API_21
+
+AVD="$1"
+
+if [ -z "$1" ]; then
+	listavds=`$EMULATOR_PATH -list-avds`
+	param=""
+else
+	is_number $AVD
+	if [ $isnumber = SI ]; then
+		listavds=`$EMULATOR_PATH -list-avds`
+		param="number"
+	else
+		listavds=`$EMULATOR_PATH -list-avds | grep $AVD`
+		param="alpha"
+	fi
+fi
+
+# Assegna avds
+n=0
+for i in $listavds
+do
+	n=$((n+1))
+	avds[$((n-1))]="$i"
+done
+
+if [ "$param" = "number" ]; then
+	if [ $param -gt $n ]; then
+		echo "indice superire al numero AVD presentei. Scegliere da lista completa"
+		listavds=`$EMULATOR_PATH -list-avds`
+	elif [ $param -gt 0 ]; then
+		avd2run=${avds[$((param-1))]}
+		echo $avd2run
+		LD_PRELOAD=$LIBSTDC_PATH $EMULATOR_PATH -netdelay none -netspeed full $WRITABLE -avd $avd2run &
+		exit 0
+	fi
+
+else
+	if [ $n -eq 1 ]; then
+		avd2run=${avds[0]}
+		echo $avd2run
+		LD_PRELOAD=$LIBSTDC_PATH $EMULATOR_PATH -netdelay none -netspeed full $WRITABLE -avd $avd2run &
+		exit 0
+	elif [ $n -eq 0 ]; then
+		echo "non trovata nessuna AVD nel pattern indicato. Scegliere da lista completa"
+		listavds=`$EMULATOR_PATH -list-avds`
+	fi
+fi
+
+
+n=0
+for i in $listavds
+do
+	n=$((n+1))
+	echo "$n) $i"
+	avds[$((n-1))]="$i"
+done
+
+
+# echo -ne "Quale? "
+scelta=""
+while [ "$scelta" = "" ]
+do
+	echo -ne "Scelta : (tra 1 e $n, 0=esci) " 
+	read scelta
+	is_number $scelta
+	if [ $isnumber = NO ]; then
+		echo "$scelta non e' un numero. Riprova"
+		scelta=""
+		continue
+	else
+		scelta=$((scelta+0))
+		# echo "scelta = $scelta"
+	fi
+	if [ $scelta -lt 0 -o $scelta -gt $n ]; then
+		echo "Scelta non valida. Tra 1 e $n"'!'" (o 0 per uscire)"
+		scelta=""
+	fi
+done
+
+if [ $scelta -eq 0 ]; then
+	exit
+fi
+avd2run=${avds[scelta-1]}
+echo $avd2run
+LD_PRELOAD=$LIBSTDC_PATH $EMULATOR_PATH -netdelay none -netspeed full $WRITABLE -avd $avd2run &
+exit 0
+
