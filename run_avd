@@ -1,4 +1,12 @@
 #!/bin/bash
+# FIXED VARS AND CONSTANT ..
+TAB=$(echo -ne "\t")
+
+# BASE (CUSTOM) VARIABLES - They may vary depending on system environment
+PROJECTS_REPDIR="$HOME/Dropbox/Android-stuff/Dev/SDK-projects"
+LIBSTDC_PATH=/usr/lib/x86_64-linux-gnu/libstdc++.so.6
+EMULATOR_PATH=/opt/Android/Sdk/emulator/emulator
+WRITABLE="-writable-system"
 
 function is_number() {
 	VARIABLE=$1
@@ -10,51 +18,6 @@ function is_number() {
 	fi
 }
 
-function ordina()
-{
-	sorttype=$1
-
-# 	if [ $sorttype -eq 0 ]; then # Ora è normale, ma il precedente aveva la data al primo campo
-# 		echo " Sort type = 0 "
-# 	else
-# 		echo " Sort type = 1 "
-# 	fi
-
-	if [ $sorttype -eq 1 ]; then
-		IFS=$'\n' sorted=($(sort -k2 -t$'\t' <<<"${filedata[*]}"))
-	else
-		IFS=$'\n' sorted=($(sort <<<"${filedata[*]}"))
-	fi
-	unset IFS
-
-	# copy=(${original[*]})
-	#filedata=(${sorted[*]})
-	# -- non funziona bene. Uso l'iterazione
-	for (( j=0; j<${#sorted[@]}; j++))
-	do
-		filedata[$j]="${sorted[$j]}"
-	done
-
-
-	## Fonte: http://stackoverflow.com/questions/7442417/how-to-sort-an-array-in-bash
-	##
-	## example:
-	## $ array=("a c" b f "3 5")
-	## $ IFS=$'\n' sorted=($(sort <<<"${array[*]}"))
-	## $ printf "[%s]\n" "${sorted[@]}"
-	## [3 5]
-	## [a c]
-	## [b]
-	## [f]
-}
-
-
-PROJECTS_REPDIR="$HOME/Dropbox/Android-stuff/Dev/SDK-projects"
-TAB=$(echo -ne "\t")
-
-WRITABLE="-writable-system"
-LIBSTDC_PATH=/usr/lib/x86_64-linux-gnu/libstdc++.so.6
-EMULATOR_PATH=/opt/Android/Sdk/emulator/emulator
 
 # LD_PRELOAD='/usr/lib/x86_64-linux-gnu/libstdc++.so.6' ~/Android/Sdk/tools/emulator -netdelay none -netspeed full -avd Nexus_5_API_21
 
@@ -69,7 +32,7 @@ else
 		listavds=`$EMULATOR_PATH -list-avds`
 		param="number"
 	else
-		listavds=`$EMULATOR_PATH -list-avds | grep $AVD`
+		listavds=`$EMULATOR_PATH -list-avds | grep -i $AVD`
 		param="alpha"
 	fi
 fi
