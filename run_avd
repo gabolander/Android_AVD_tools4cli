@@ -3,7 +3,6 @@
 TAB=$(echo -ne "\t")
 
 # BASE (CUSTOM) VARIABLES - They may vary depending on system environment
-PROJECTS_REPDIR="$HOME/Dropbox/Android-stuff/Dev/SDK-projects"
 LIBSTDC_PATH=/usr/lib/x86_64-linux-gnu/libstdc++.so.6
 EMULATOR_PATH=/opt/Android/Sdk/emulator/emulator
 WRITABLE="-writable-system"
