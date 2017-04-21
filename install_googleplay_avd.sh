@@ -69,6 +69,16 @@ fi
 ####
 #  Funzioni
 #
+function is_number() {
+	VARIABLE=$1
+	if [ $VARIABLE -eq $VARIABLE 2> /dev/null ]; then
+		# echo $VARIABLE is a number
+		isnumber=YES
+	else
+		isnumber=NO
+	fi
+}
+
 function at_exit()
 {
   if [ "$1" -gt 0 -a "$1" -lt 32 ]; then
@@ -97,6 +107,10 @@ function at_exit()
   esac
 
   rm -rf "$TEMPORANEI"
+
+  # Clear screen before exit?
+  # clear
+
   exit $1
 }
 
@@ -309,21 +323,149 @@ eval "set -- $newparams"
 ## fi
 ## echo
 
+# Look for what TUI to use
+TUI=""
+if [ -n "$WHIPTAIL" ]; then
+	TUI=$WHIPTAIL
+elif [ -n "$DIALOG" ]; then
+	TUI=$DIALOG
+fi
+
+# DEBUG
+# TUI= ... (TUI="" | TUI=$DIALOG | TUI=$WHIPTAIL)
+TUI=""
+
+clear
 
 $ADB_PATH devices | grep -v -e "List of dev" -e "^$" | grep "^emulator-" > $TMP1
+
+# DEBUG - Alter tmp with a custom (fake) list
+TMP1=/tmp/a
+
 nl=`$CAT $TMP1 | $WC -l`
 
 
 if [ "$nl" -eq 0 ]; then
-	echo "No running AVD found. Please lunch at least one x86 AVD to install Google Play onto."
+	if [ -n "$TUI" ]; then
+		$TUI --msgbox "No running AVD found. Please lunch at least one x86 AVD to install Google Play onto." 10 60
+	else
+		echo "No running AVD found. Please lunch at least one x86 AVD to install Google Play onto."
+	fi
 	at_exit -1
 fi
 
 # /opt/Android/Sdk/platform-tools/adb devices | grep -v -e "List of dev" -e "^$"
+declare -a avds
+cnt=0
+while read line
+do
+	avds[$((cnt++))]=$line
+done < $TMP1
+
+if [ "$nl" -gt 1 ]; then
+	MSG="More then one running AVD found. Please select one to install GP onto from following list:"
+	if [ -n "$TUI" ]; then
+		CMD="$TUI --radiolist \"$MSG\" 20 60 10 "
+		for c in $(seq 0 $((cnt-1)))
+		do
+			[ $c -eq 0 ] && en=1 || en=0
+			CMD="$CMD $((c+1)) \"${avds[$c]}\" $en "
+		done
+		CMD="$CMD 3>&1 1>&2 2>&3"
+		echo "CMD : $CMD" # DEBUG
+		choice=`eval $CMD`
+		[ $? -ne 0 ] && at_exit -2
+		AVD=${avds[$((choice-1))]}
+	else
+		echo $MSG
+		for c in $(seq 0 $((cnt-1)))
+		do
+			echo " $((c+1))) ${avds[$c]} "
+		done
+		choice=""
+		while [ -z "$choice" ]; do
+			echo -n "Choose (1-${cnt},0=Cancel and exit): "
+			read choice
+			is_number $choice
+			if [ $isnumber = NO ]; then
+				echo "   INPUT ERR: $choice is not a number. Invalid entry, retry."
+				choice=""
+				continue
+			else
+				choice=$((choice+0))
+			fi
+			if [ $choice -lt 0 -o $choice -gt $cnt ]; then
+				echo "Invalid entry. Must be between 1 e $cnt"'!'" (or 0 to exit)"
+				choice=""
+			fi
+
+		done
+		[ $choice -eq 0 ] && at_exit -2
+		AVD=${avds[$((choice-1))]}
+	fi
+else
+	AVD=${avds[0]}
+fi
+
+# ret=0
+# echo "AVD: $AVD"
+# exit $ret
+
+TXT="Well. Now I will try to install Google Play on the following running AVD:
+$AVD
+
+You must be recalled that AVD has to be run with the '-writable-system' option
+in order to write on its /system, otherwise the procedure will fail.
+"
+
+if [ -n "$TUI" ]; then
+	TXT="$TXT Proceed? "
+	dialog --title "Proceed with install ..." --yesno "$TXT" 20 60
+	[ $? -eq 0 ] || at_exit -2
+else
+	echo
+	echo $TXT
+	ans=""
+	while [ -z "$ans" ]
+	do
+		echo -n "Proceed? (YySs/N/ ): "
+		read ans
+		ans=$(echo $ans | cut -c1 | tr [:lower:] [:upper:])
+		if [ $ans != "Y" -a $ans != "S" -a $ans != "N" -a $ans != " " ]; then
+			echo "INPUT ERR: Invalid answer."
+			ans="" 
+			continue
+		fi
+	done
+	[ $ans = "S" -o $ans = "Y" ] || at_exit -2
+fi
 
 
-ret=$?
-echo "Result: $ret"
-exit $ret
+echo "GO ON .."
+
+### Enter to android's shell and get root:
+###  ./adb shell
+###  su
+### 
+### Check where system directory is mounted to:
+###  cat /proc/mounts|grep system
+### 
+### And then remount it with 'rw' permissions:
+###  mount -o rw,remount /dev/block/vda /system
+### 
+### Check if GoogleServicesFramework is present under /system/priv-app ....
+### 
+### 
+### Restart adb as root and push Phonesky.apk:
+###  ./adb root
+###  ./adb push ~/Phonesky.apk /system/priv-app/
+### 
+### Restart avd:
+###  ./adb shell stop
+###  ./adb shell start
+### 
+
+
+
 
 at_exit 0
