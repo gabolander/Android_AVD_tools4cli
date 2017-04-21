@@ -1,11 +1,5 @@
 #!/bin/bash
 
-
-# /opt/Android/Sdk/platform-tools $ ./adb shell "cat /system/build.prop" | grep ro.build.version.release
-# ro.build.version.release=7.1.1
-# /opt/Android/Sdk/platform-tools $ ./adb shell "cat /system/build.prop" | grep ro.build.version.sdk
-# ro.build.version.sdk=25
-
 # BASE (CUSTOM) VARIABLES - They may vary depending on system environment
 LIBSTDC_PATH=/usr/lib/x86_64-linux-gnu/libstdc++.so.6
 SDK_HOME=/opt/Android/Sdk
@@ -280,6 +274,24 @@ done
 }
 
 
+function infobox() {
+	if [ -n "$DIALOG" ]; then
+		# For infobox option, I use 'dialog' anyway because of a bug of whiptail !!
+		$DIALOG --infobox "$1" 15 50
+	else
+		echo "- $1"
+	fi
+}
+
+function show_error() {
+	if [ -n "$TUI" ]; then
+		$DIALOG --title "Error" --msgbox "$1" 15 60
+	else
+		echo "ERROR: $1"
+	fi
+}
+
+
 
 #############################################################
 # INIZIO SCRIPT                                             #
@@ -333,14 +345,14 @@ fi
 
 # DEBUG
 # TUI= ... (TUI="" | TUI=$DIALOG | TUI=$WHIPTAIL)
-TUI=""
+# TUI=""
 
 clear
 
 $ADB_PATH devices | grep -v -e "List of dev" -e "^$" | grep "^emulator-" > $TMP1
 
 # DEBUG - Alter tmp with a custom (fake) list
-TMP1=/tmp/a
+# TMP1=/tmp/a
 
 nl=`$CAT $TMP1 | $WC -l`
 
@@ -362,6 +374,7 @@ do
 	avds[$((cnt++))]=$line
 done < $TMP1
 
+SERIAL_OPTION=""
 if [ "$nl" -gt 1 ]; then
 	MSG="More then one running AVD found. Please select one to install GP onto from following list:"
 	if [ -n "$TUI" ]; then
@@ -403,6 +416,7 @@ if [ "$nl" -gt 1 ]; then
 		[ $choice -eq 0 ] && at_exit -2
 		AVD=${avds[$((choice-1))]}
 	fi
+	SERIAL_OPTION="-s $AVD"
 else
 	AVD=${avds[0]}
 fi
@@ -420,7 +434,7 @@ in order to write on its /system, otherwise the procedure will fail.
 
 if [ -n "$TUI" ]; then
 	TXT="$TXT Proceed? "
-	dialog --title "Proceed with install ..." --yesno "$TXT" 20 60
+	$TUI --title "Proceed with install ..." --yesno "$TXT" 20 60
 	[ $? -eq 0 ] || at_exit -2
 else
 	echo
@@ -441,7 +455,7 @@ else
 fi
 
 
-echo "GO ON .."
+# echo "GO ON .."
 
 ### Enter to android's shell and get root:
 ###  ./adb shell
@@ -465,7 +479,87 @@ echo "GO ON .."
 ###  ./adb shell start
 ### 
 
+# First, let's grant root access to device...
+infobox "Asking root permission to device ... "
+$ADB_PATH $SERIAL_OPTION root
+sleep 1
+
+# First of all, let's check to have a x86 AVD with Google Services ...
+infobox "Checking if it's w/ Google API ... "
+out=$($ADB_PATH $SERIAL_OPTION shell ls /system/priv-app/GoogleServicesFramework* 2>&1)
+# Check No such file ..
+if (echo $out | grep -q "No such file"); then 
+	show_error "Seems that GoogleServicesFramework is not present
+	AVD must be an Android VM with Google API to make it work."
+	at_exit -3
+fi
+sleep 1
+
+# remount /system RW
+infobox "Remounting /system in rw"
+outtmp=$($ADB_PATH $SERIAL_OPTION shell cat /proc/mounts|grep -w "\/system")
+out=$(echo $outtmp | awk '{print $1}')
+CMD="$ADB_PATH $SERIAL_OPTION shell mount -o rw,remount /system"
+eval $CMD
+sleep 1
+# Recheck
+outtmp=$($ADB_PATH $SERIAL_OPTION shell cat /proc/mounts|grep -w "\/system")
+if !(echo $outtmp | grep -q "\/system"); then
+	show_error "Something wrong in remounting /system. Please check before running this script again."
+	at_exit -3
+fi
+
+# Check for x86 device ....
+infobox "Checking for x86 virtual emulator .."
+out=$($ADB_PATH $SERIAL_OPTION shell "cat /system/build.prop" | grep "^ro.product.device" | cut -f2 -d"=" | sed "s/\s//g")
+if [ "$out" != "generic_x86" ]; then
+	show_error "This scripts only works with x86 emulator. Please check before running this script again. ($out)"
+	at_exit -3
+fi
+sleep 1
+
+# Now checking version and distributing right Phonesky.apk
+# /opt/Android/Sdk/platform-tools $ ./adb shell "cat /system/build.prop" | grep ro.build.version.release
+# ro.build.version.release=7.1.1
+# /opt/Android/Sdk/platform-tools $ ./adb shell "cat /system/build.prop" | grep ro.build.version.sdk
+# ro.build.version.sdk=25
+infobox "Checking android version ... "
+out=$($ADB_PATH $SERIAL_OPTION shell "cat /system/build.prop" | grep "^ro.build.version.release" | cut -f2 -d"=")
+case $out in
+	4.4*) PHONESKY_SOURCE="repo/Phonesky.apk-x86-4.4"
+		;;
+	5.0*) PHONESKY_SOURCE="repo/Phonesky.apk-x86-5.0"
+		;;
+	5.1*) PHONESKY_SOURCE="repo/Phonesky.apk-x86-5.1"
+		;;
+	6.0*) PHONESKY_SOURCE="repo/Phonesky.apk-x86-6.0"
+		;;
+	7.0*) PHONESKY_SOURCE="repo/Phonesky.apk-x86-7.0"
+		;;
+	7.1*) PHONESKY_SOURCE="repo/Phonesky.apk-x86-7.1"
+		;;
+	*) PHONESKY_SOURCE="Err"
+		;;
+esac
+
+if [ "$PHONESKY_SOURCE" = "Err" ]; then
+	show_error "Can't recognize AVD android version, or it is not a supported ones.
+	ro.build.version.release now is $out. Please check. Quitting."
+	at_exit -4
+fi
+
+	
+infobox "Pushing Phonesky.apk $out on device's /system/priv-app/ ... "
+CMD="$ADB_PATH $SERIAL_OPTION push $PRGDIR/$PHONESKY_SOURCE /system/priv-app/Phonesky.apk"
+eval $CMD
+sleep 1
 
 
+infobox " EVERYTHING DONE"'!'" Now I make restart the AVD. Please check if Google Play is correctly installed afterword "
+
+$ADB_PATH $SERIAL_OPTION shell stop
+$ADB_PATH $SERIAL_OPTION shell start
+
+sleep 1
 
 at_exit 0
