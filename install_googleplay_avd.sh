@@ -1,4 +1,10 @@
 #!/bin/bash
+#
+# Author: Gabriele Zappi (Gabolander developer) <gabodevelop@gmail.com>
+#
+# Release date: 2017 April 21st
+# 
+# See README and LICENSE for more details.
 
 # BASE (CUSTOM) VARIABLES - They may vary depending on system environment
 LIBSTDC_PATH=/usr/lib/x86_64-linux-gnu/libstdc++.so.6
