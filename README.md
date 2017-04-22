@@ -35,9 +35,10 @@ If run with a parameter:
 ####  (Still Work in progress ...)
 **install_googleplay_avd.sh** script, can run with or without parameters. (Nowadays, only without params)
 
-It uses console UI dialog or whiptail if you have one of them installed in your system.
+It uses console UI _dialog_ or _whiptail_ if you have one of them installed in your system.
 This script will drive you to install Google Play in your running AVD Android emulator.
 
 ### NOTE
-Please, _remember to change **SDK_HOME** variable_ into both script according to your system's Android SDK installation.
+Please, _remember to change **SDK_HOME** variable_ into both scripts according to your system's Android SDK installation path.
+In **run_avd** script, you should also check if *LIBSTDC_PATH* variable points to the correct path.
 
