@@ -561,7 +561,7 @@ eval $CMD
 sleep 1
 
 
-infobox " EVERYTHING DONE"'!'" Now I make restart the AVD. Please check if Google Play is correctly installed afterword "
+infobox " EVERYTHING DONE"'!'" Now I make restart the AVD. Please check if Google Play is correctly installed afterwards. "
 
 $ADB_PATH $SERIAL_OPTION shell stop
 $ADB_PATH $SERIAL_OPTION shell start

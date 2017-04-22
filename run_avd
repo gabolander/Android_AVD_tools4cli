@@ -3,8 +3,10 @@
 TAB=$(echo -ne "\t")
 
 # BASE (CUSTOM) VARIABLES - They may vary depending on system environment
+SDK_HOME=/opt/Android/Sdk
 LIBSTDC_PATH=/usr/lib/x86_64-linux-gnu/libstdc++.so.6
-EMULATOR_PATH=/opt/Android/Sdk/emulator/emulator
+
+EMULATOR_PATH=$SDK_HOME/emulator/emulator
 WRITABLE="-writable-system"
 
 function is_number() {
